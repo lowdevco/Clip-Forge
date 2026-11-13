@@ -4,6 +4,13 @@
 Usage:
   python render.py VIDEO --clips WORKDIR/clips.json --out OUTDIR
                    [--transcript WORKDIR/transcript.json] [--only 1,3]
+                   [--style bold|clean|neon|fire] [--watermark "@handle"]
+                   [--progress] [--preview]
+
+--style, --watermark and --progress set the default for every clip; a clip can
+override each with its own "style", "watermark" and "progress" keys.
+--preview renders small, fast drafts (540x960, *_preview.mp4) for checking
+framing and timing before the full-quality render.
 
 clips.json:
 {"clips": [{
@@ -13,8 +20,12 @@ clips.json:
    "layout": "auto",      # auto | speaker | blur | center | split
    "facecam": [1500, 20, 400, 300],  # split only: x,y,w,h in source pixels
    "zoom": 1.4,           # blur only: enlarge the sharp picture, trimming sides
+   "focus_x": 0.5,        # center only: 0 = left edge, 1 = right edge
    "tighten": true,       # cut silences > 0.7 s (talk clips; needs transcript)
-   "captions": true
+   "captions": true,
+   "style": "bold",       # caption look: bold | clean | neon | fire
+   "watermark": "@handle",  # small channel tag for the whole clip
+   "progress": true       # thin progress bar along the top edge
 }]}
 
 Layouts
@@ -38,6 +49,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FONTS = os.path.join(HERE, "..", "assets", "fonts")
 OUT_W, OUT_H = 1080, 1920
 SPLIT_TOP = 608            # facecam band height in the split layout
+
+# Caption looks. Colours are ASS order (&HBBGGRR&); "bar" is the same accent
+# as RRGGBB for the progress bar.
+STYLES = {
+    "bold":  {"size": 86, "upper": True,  "hi": "&H00E6FF&", "bar": "FFE600",
+              "outline": 7, "shadow": 3, "outline_col": "&H00000000", "y": 1300},
+    "clean": {"size": 64, "upper": False, "hi": "&HFFD28C&", "bar": "8CD2FF",
+              "outline": 4, "shadow": 1, "outline_col": "&H00000000", "y": 1420},
+    "neon":  {"size": 82, "upper": True,  "hi": "&H14FF39&", "bar": "39FF14",
+              "outline": 8, "shadow": 0, "outline_col": "&H003D0A2B", "y": 1300},
+    "fire":  {"size": 92, "upper": True,  "hi": "&H007AFF&", "bar": "FF7A00",
+              "outline": 8, "shadow": 4, "outline_col": "&H00000000", "y": 1300},
+}
 
 
 def run(cmd, **kw):
@@ -117,6 +141,8 @@ def choose_layout(clip, video, start, end):
             layout = "speaker" if (rate >= 0.5 and size >= 0.12) else "blur"
         elif cx is None:
             cx = 0.5
+    if layout == "center" and clip.get("focus_x") is not None:
+        cx = min(max(float(clip["focus_x"]), 0.0), 1.0)
     return layout, cx
 
 
@@ -188,12 +214,27 @@ def is_malayalam(text):
     return any("ഀ" <= ch <= "ൿ" for ch in text)
 
 
-def build_ass(words, hook, layout, total, path):
+def balanced_wrap(text, width, max_lines=3):
+    """Wrap like textwrap, then narrow the width until the lines are even, so
+    a headline never ends with one short word alone on the last line."""
+    lines = textwrap.wrap(text, width=width)
+    if len(lines) < 2:
+        return lines
+    n = len(lines)
+    for w in range(max(len(text) // n, 6), width + 1):
+        trial = textwrap.wrap(text, width=w)
+        if len(trial) <= n:
+            return trial[:max_lines]
+    return lines[:max_lines]
+
+
+def build_ass(words, hook, layout, total, path, style="bold", watermark=None):
+    st = STYLES.get(style, STYLES["bold"])
     text_all = " ".join(w["w"] for w in words) + " " + (hook or "")
     ml = is_malayalam(text_all)
     font = "Noto Sans Malayalam" if ml else "Poppins ExtraBold"
-    size = 70 if ml else 86
-    cap_y = SPLIT_TOP if layout == "split" else 1300
+    size = round(st["size"] * 0.81) if ml else st["size"]
+    cap_y = SPLIT_TOP if layout == "split" else st["y"]
     hook_y = 120 if layout == "split" else 250
     head = f"""[Script Info]
 ScriptType: v4.00+
@@ -204,7 +245,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,{-1 if ml else 0},0,0,0,100,100,0,0,1,7,3,5,60,60,60,1
+Style: Cap,{font},{size},&H00FFFFFF,&H00FFFFFF,{st["outline_col"]},&H96000000,{-1 if ml else 0},0,0,0,100,100,0,0,1,{st["outline"]},{st["shadow"]},5,60,60,60,1
+Style: Mark,Poppins ExtraBold,38,&H59FFFFFF,&H59FFFFFF,&H59000000,&H96000000,0,0,0,0,100,100,1,0,1,3,0,5,60,60,60,1
 Style: Hook,{font},{58 if ml else 64},&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,{-1 if ml else 0},0,0,0,100,100,0,0,3,16,0,5,60,60,60,1
 
 [Events]
@@ -212,11 +254,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lines = []
     if hook:
-        wrapped = textwrap.wrap(clean(hook), width=20 if ml else 24)[:3]
+        wrapped = balanced_wrap(clean(hook), 20 if ml else 24)
         for i, ln in enumerate(wrapped):
             y = hook_y + i * (112 if ml else 104)
             lines.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(3.5, total))},"
                          f"Hook,,0,0,0,,{{\\pos({OUT_W // 2},{y})}}{ln}")
+
+    if watermark:
+        lines.append(f"Dialogue: 0,{ass_time(0)},{ass_time(total)},Mark,,0,0,0,,"
+                     f"{{\\pos({OUT_W // 2},1560)}}{clean(str(watermark))}")
 
     # Group words into short chunks; show the chunk, light up the spoken word.
     chunks, cur = [], []
@@ -225,7 +271,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         tok = clean(w["w"])
         if not tok:
             continue
-        w = {**w, "w": tok if ml else tok.upper()}
+        w = {**w, "w": tok.upper() if (st["upper"] and not ml) else tok}
         length = sum(len(x["w"]) + 1 for x in cur) + len(tok)
         if cur and (len(cur) >= 3 or length > limit or w["s"] - cur[-1]["e"] > 0.6):
             chunks.append(cur)
@@ -243,7 +289,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 continue
             parts = []
             for j, x in enumerate(chunk):
-                parts.append(f"{{\\c&H00E6FF&}}{x['w']}{{\\c&HFFFFFF&}}"
+                parts.append(f"{{\\c{st['hi']}}}{x['w']}{{\\c&HFFFFFF&}}"
                              if j == i else x["w"])
             lines.append(f"Dialogue: 0,{ass_time(s)},{ass_time(e)},Cap,,0,0,0,,"
                          f"{{\\pos({OUT_W // 2},{cap_y})}}" + " ".join(parts))
@@ -253,7 +299,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 # ---------- render one clip --------------------------------------------------
-def render_clip(video, info, clip, all_words, outdir, workdir):
+def render_clip(video, info, clip, all_words, outdir, workdir, opts=None):
+    opts = opts or {}
     start = max(float(clip["start"]), 0)
     end = min(float(clip["end"]), info["duration"])
     dur = end - start
@@ -271,7 +318,14 @@ def render_clip(video, info, clip, all_words, outdir, workdir):
     cid = int(clip.get("id", 0))
     slug = re.sub(r"[^a-z0-9]+", "-", str(clip.get("slug") or clip.get("hook")
                                            or "clip").lower()).strip("-")[:40]
-    out_name = f"short_{cid:02d}_{slug or 'clip'}.mp4"
+    preview = bool(opts.get("preview"))
+    out_name = (f"short_{cid:02d}_{slug or 'clip'}"
+                f"{'_preview' if preview else ''}.mp4")
+    style = clip.get("style") or opts.get("style") or "bold"
+    if style not in STYLES:
+        style = "bold"
+    watermark = clip.get("watermark", opts.get("watermark"))
+    progress = clip.get("progress", opts.get("progress", False))
     out_path = os.path.abspath(os.path.join(outdir, out_name))
 
     # ffmpeg runs inside workdir with relative names, so Windows drive letters
@@ -279,7 +333,8 @@ def render_clip(video, info, clip, all_words, outdir, workdir):
     ass_name = f"clip_{cid:02d}.ass"
     show_caps = clip.get("captions", True) and words
     n_chunks = build_ass(words if show_caps else [], clip.get("hook"), layout,
-                         total, os.path.join(workdir, ass_name))
+                         total, os.path.join(workdir, ass_name), style,
+                         watermark)
 
     parts = []
     if len(segs) > 1:
@@ -291,20 +346,31 @@ def render_clip(video, info, clip, all_words, outdir, workdir):
         parts.append("[0:a]asetpts=PTS-STARTPTS[a0]")
     parts.append(video_chain(layout, cx, clip, info["w"], info["h"]))
     fps = min(round(info["fps"]), 60) or 30
-    parts.append(f"[vf]ass={ass_name}:fontsdir=fonts,fps={fps},"
-                 f"format=yuv420p[vout]")
+    tail = f"fps={fps},format=yuv420p"
+    if preview:
+        tail = f"scale={OUT_W // 2}:{OUT_H // 2}," + tail
+    if progress:
+        # A bar as wide as the frame slides in from the left edge.
+        parts.append(f"[vf]ass={ass_name}:fontsdir=fonts[vc]")
+        parts.append(f"color=c=0x{STYLES[style]['bar']}:s={OUT_W}x12:r={fps}:"
+                     f"d={total + 1:.2f}[bar]")
+        parts.append(f"[vc][bar]overlay=x='-w+w*t/{total:.3f}':y=0:shortest=1,"
+                     f"{tail}[vout]")
+    else:
+        parts.append(f"[vf]ass={ass_name}:fontsdir=fonts,{tail}[vout]")
     parts.append("[a0]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[aout]")
 
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{start:.3f}",
            "-t", f"{dur:.3f}", "-i", os.path.abspath(video),
            "-filter_complex", ";".join(parts),
            "-map", "[vout]", "-map", "[aout]",
-           "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+           "-c:v", "libx264", "-preset", "ultrafast" if preview else "veryfast",
+           "-crf", "28" if preview else "20",
            "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out_path]
     res = run(cmd, cwd=workdir)
     ok = res.returncode == 0 and os.path.exists(out_path)
     return {"id": cid, "ok": ok, "file": out_path if ok else None,
-            "layout": layout, "seconds": round(total, 1),
+            "layout": layout, "style": style, "seconds": round(total, 1),
             "silence_cut": round(dur - total, 1), "caption_chunks": n_chunks,
             "error": None if ok else res.stderr[-600:]}
 
@@ -316,7 +382,15 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--transcript")
     ap.add_argument("--only", help="comma-separated clip ids")
+    ap.add_argument("--style", choices=sorted(STYLES), default="bold")
+    ap.add_argument("--watermark", help='channel tag on every clip, e.g. "@name"')
+    ap.add_argument("--progress", action="store_true",
+                    help="thin progress bar along the top edge")
+    ap.add_argument("--preview", action="store_true",
+                    help="fast 540x960 drafts (*_preview.mp4)")
     args = ap.parse_args()
+    opts = {"style": args.style, "watermark": args.watermark,
+            "progress": args.progress, "preview": args.preview}
 
     with open(args.clips, encoding="utf-8") as fh:
         clips = json.load(fh)["clips"]
@@ -340,7 +414,7 @@ def main():
     info = probe(args.video)
     results = []
     for clip in clips:
-        r = render_clip(args.video, info, clip, words, args.out, workdir)
+        r = render_clip(args.video, info, clip, words, args.out, workdir, opts)
         results.append(r)
         print(json.dumps(r, ensure_ascii=False), flush=True)
     with open(os.path.join(args.out, "render_report.json"), "w",

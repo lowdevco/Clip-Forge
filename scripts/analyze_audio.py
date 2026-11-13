@@ -25,18 +25,11 @@ def ts(t):
         else f"{t // 60:02d}:{t % 60:02d}"
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("video")
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--top", type=int, default=25)
-    ap.add_argument("--min-gap", type=float, default=20,
-                    help="seconds between reported peaks")
-    args = ap.parse_args()
-    os.makedirs(args.out, exist_ok=True)
-
+def loudness(video):
+    """Return (db, lift, seconds): loudness per 0.5 s window, and how far each
+    window rises above the median of the minute around it."""
     raw = subprocess.run(
-        ["ffmpeg", "-loglevel", "error", "-i", args.video, "-vn", "-ac", "1",
+        ["ffmpeg", "-loglevel", "error", "-i", video, "-vn", "-ac", "1",
          "-ar", str(SR), "-f", "s16le", "-"],
         capture_output=True, check=True).stdout
     pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768
@@ -50,7 +43,20 @@ def main():
     half = int(30 / WIN)
     base = np.array([np.median(smooth[max(0, i - half):i + half + 1])
                      for i in range(len(smooth))])
-    lift = smooth - base
+    return db, smooth - base, len(pcm) / SR
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("video")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--min-gap", type=float, default=20,
+                    help="seconds between reported peaks")
+    args = ap.parse_args()
+    os.makedirs(args.out, exist_ok=True)
+
+    db, lift, seconds = loudness(args.video)
 
     order = np.argsort(-lift)
     peaks, gap = [], int(args.min_gap / WIN)
@@ -76,7 +82,7 @@ def main():
                      "burst_end": round((b + 1) * WIN, 1)})
 
     quiet = float(np.percentile(db, 10))
-    result = {"duration": round(len(pcm) / SR, 1),
+    result = {"duration": round(seconds, 1),
               "median_db": round(float(np.median(db)), 1),
               "quiet_floor_db": round(quiet, 1), "peaks": rows}
     with open(os.path.join(args.out, "audio_peaks.json"), "w") as fh:
