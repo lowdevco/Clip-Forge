@@ -1,3 +1,5 @@
+<div align="center">
+
 # ClipForge
 
 **Paste a link. Pick your favourites. Get Shorts that look edited.**
@@ -12,6 +14,10 @@ colour is graded, the camera punches in on the big moments, and the headline
 and captions are animated.
 
 Created by [samknows.ai](https://www.instagram.com/samknows.ai)
+
+<a href="https://www.instagram.com/samknows.ai/">
+  <img src="https://raw.githubusercontent.com/lowdevco/Video-editing-effects/main/assets/samknowsai.jpeg" width="380" alt="samknows.ai" style="border-radius: 10px;" />
+</a>
 
 ## What you type
 
@@ -160,3 +166,5 @@ Some bundled files keep their own licences: the Poppins, Anton and Noto Sans
 Malayalam fonts (SIL Open Font License, texts in `assets/fonts/`), the YuNet
 face-detection models from OpenCV Zoo (MIT), and OpenCV's Haar cascade (its
 licence is stated inside the file).
+
+</div>
