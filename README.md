@@ -12,15 +12,32 @@ into ready-to-post vertical Shorts / Reels / TikToks.
 
 ## Commands
 
-| Command | For |
-|---|---|
-| `/clip-gameplay <link>` | Game recordings and streams |
-| `/clip-podcast <link>` | Podcasts, interviews, talking head |
-| `/clip-video <link>` | Any other video (vlog, tutorial, event, sports) |
+| Command | For | What it does |
+|---|---|---|
+| `/clip-gameplay <link>` | Game recordings and streams | Ranks the busiest stretches by sound and motion, checks a filmstrip of each for fights, clutches, wins and fails, and frames them full-screen or with the facecam on top. Captions only if someone talks; pauses are kept for tension |
+| `/clip-podcast <link>` | Podcasts, interviews, talking head | Transcribes the video, picks passages that stand alone (a bold claim, a surprising number, a story, a punchline), crops onto the speaker, burns word-by-word captions and trims silences |
+| `/clip-video <link>` | Any other video (vlog, tutorial, event, sports) | Uses both the transcript and the pictures, and lets the video decide which leads: one tip start to finish, a reveal, a before-and-after, a reaction |
 
 Each command fixes the mode, so Claude does not have to work out what kind of
-video it is. Extra wishes go after the link:
+video it is. With no command, the `clip-forge` skill decides the mode itself.
+
+Whichever command you use, the steps are the same:
+
+1. Get the video from the link (or use a file you already have).
+2. Find 8–12 candidate moments and score each out of 100.
+3. Show the scored table and wait for you to pick.
+4. Render the picked clips as 1080x1920 with a hook headline.
+5. Write a title, caption and hashtags for each clip.
+
+Extra wishes go after the link:
 `/clip-gameplay <link> top 3, neon captions, watermark @myname`.
+
+| Wish | Options |
+|---|---|
+| Caption style | `bold` (default), `clean`, `neon`, `fire` |
+| Watermark | A channel tag such as `@myname`, shown small for the whole clip |
+| Progress bar | A thin bar along the top that fills as the clip plays |
+| Framing | `speaker`, `center`, `blur`, `split` (facecam on top), or `auto` |
 
 In Claude Code the three are real slash commands once installed. In the
 Claude app, type the command at the start of the message; the skill
