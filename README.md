@@ -1,104 +1,136 @@
 # ClipForge
 
-A Claude skill that turns a long YouTube video, podcast or gameplay recording
-into ready-to-post vertical Shorts / Reels / TikToks.
+**Turn long videos into edited vertical Shorts, Reels and TikToks, with one command in Claude.**
 
-- Finds the best moments: transcript for podcasts, sound + motion + frames for gameplay
-- Shows a scored table of candidates and waits for approval
-- Renders 1080x1920 clips with word-by-word captions (English and Malayalam),
-  a hook headline, silence trimming and -14 LUFS audio
-- Four caption styles, optional channel watermark and progress bar
-- Writes a title, caption and hashtags for each clip
+ClipForge is a Claude skill. Give it a YouTube link or a video file and it
+finds the moments worth clipping, shows you a scored shortlist, and renders
+the ones you pick as finished 1080x1920 clips: full-screen framing, colour
+grade, punch-in zooms, sound effects, an animated headline and word-by-word
+captions.
+
+Created by **samknows.ai** · MIT licence © lowdevco
 
 ## Commands
 
-| Command | For | What it does |
+| Command | Use it for | How it finds the moments |
 |---|---|---|
-| `/clip-gameplay <link>` | Game recordings and streams | Ranks the busiest stretches by sound and motion, checks a filmstrip of each for fights, clutches, wins and fails, and frames them full-screen or with the facecam on top. Captions only if someone talks; pauses are kept for tension |
-| `/clip-podcast <link>` | Podcasts, interviews, talking head | Transcribes the video, picks passages that stand alone (a bold claim, a surprising number, a story, a punchline), crops onto the speaker, burns word-by-word captions and trims silences |
-| `/clip-video <link>` | Any other video (vlog, tutorial, event, sports) | Uses both the transcript and the pictures, and lets the video decide which leads: one tip start to finish, a reveal, a before-and-after, a reaction |
+| `/clip-gameplay <link>` | Game recordings and streams | Sound, motion and kill-feed changes; reads the frames for fights, clutches and wins |
+| `/clip-podcast <link>` | Podcasts, interviews, talking head | Reads the transcript for passages that stand alone; tracks who is speaking |
+| `/clip-sports <link>` | Matches and broadcasts | Crowd and commentator noise, plus scoreboard changes |
+| `/clip-tutorial <link>` | How-to, lessons, screen recordings | One complete tip, fix or result per clip |
+| `/clip-video <link>` | Anything else: vlogs, reviews, events | Transcript and pictures together |
+| `/clip-edit <file or link>` | A clip you already have | No search: goes straight to the edit |
 
-Each command fixes the mode, so Claude does not have to work out what kind of
-video it is. With no command, the `clip-forge` skill decides the mode itself.
-
-Whichever command you use, the steps are the same:
-
-1. Get the video from the link (or use a file you already have).
-2. Find 8–12 candidate moments and score each out of 100.
-3. Show the scored table and wait for you to pick.
-4. Render the picked clips as 1080x1920 with a hook headline.
-5. Write a title, caption and hashtags for each clip.
-
-Extra wishes go after the link:
-`/clip-gameplay <link> top 3, neon captions, watermark @myname`.
-
-| Wish | Options |
-|---|---|
-| Caption style | `bold` (default), `clean`, `neon`, `fire` |
-| Watermark | A channel tag such as `@myname`, shown small for the whole clip |
-| Progress bar | A thin bar along the top that fills as the clip plays |
-| Framing | `speaker`, `center`, `blur`, `split` (facecam on top), or `auto` |
-
-In Claude Code the three are real slash commands once installed. In the
-Claude app, type the command at the start of the message; the skill
-description lists them so the skill is picked up.
-
-## Build and install
+Add wishes after the link:
 
 ```
-python tools/build.py              # writes dist/*.zip
-python tools/build.py --install    # also copies the skills to ~/.claude/skills
+/clip-gameplay <link> top 3, neon captions, watermark @myname
 ```
 
-This produces four self-contained skills from the one source:
+With no command, the `clip-forge` skill works out the kind of video itself.
 
-| Zip | What it is |
+## How it works
+
+1. **Get the video** from the link, or use a file you already have.
+2. **Find 8–12 candidates** and score each out of 100 for hook, payoff,
+   standing alone, emotion and pace.
+3. **Show the table** and wait for you to pick.
+4. **Edit and render** the picks.
+5. **Write a title, caption and hashtags** for each clip.
+
+## The edit
+
+| Edit | Use for | What it does |
+|---|---|---|
+| `hype` | Gameplay, sports | Vivid grade, slow push-in, punch-in + shake + flash with a bass thump on key moments, all-caps headline, progress bar |
+| `premium` | General video (default) | Punchy grade, slow push-in, punch-in with a soft thump, bold headline |
+| `story` | Podcasts, talking head | Soft grade, zoom cuts on sentence changes, animated captions |
+| `clean` | Business, tutorials | Soft grade and animated text only |
+| `raw` | Untouched | Plain cut, boxed headline, static captions |
+
+| Feature | Details |
 |---|---|
-| `dist/clip-forge.zip` | All-in-one: detects the kind of video, and accepts the three commands as typed text |
-| `dist/clip-gameplay.zip` | Fixed to gameplay mode |
-| `dist/clip-podcast.zip` | Fixed to podcast mode |
-| `dist/clip-video.zip` | Fixed to general-video mode |
+| Layouts | `speaker`, `center` (full screen), `stack` (two speakers), `split` (facecam on top), `blur` |
+| Speaker tracking | Detects camera cuts, tracks faces in each shot, and keeps the crop on the person talking |
+| Key moments | Found from the sound or set by Claude: `punch`, `shake`, `flash`, `slowmo`, plus callout words such as "GOAL" |
+| Headline | Animated, with accent-coloured key words |
+| Captions | Word by word, in four styles (`bold`, `clean`, `neon`, `fire`); English and Malayalam |
+| Sound | Levelled to -14 LUFS; thump, whoosh and pop effects are generated by the skill |
+| Finishing | Outro tag, channel watermark, progress bar, silence trimming |
+| Safe area | Text stays clear of the Shorts, Reels and TikTok buttons |
 
-**Claude app:** upload the zips you want as skills (all four, or only
-`clip-forge.zip`).
+## Install
 
-**Claude Code:** run the `--install` form.
+Build the skill packages:
 
-## Layout
+```
+python tools/build.py
+```
+
+This writes seven zips to `dist/`: `clip-forge.zip` (all-in-one) and one per
+command.
+
+- **Claude app:** upload the zips you want as skills, then type a command at
+  the start of a message.
+- **Claude Code:** run `python tools/build.py --install` to copy them to
+  `~/.claude/skills`, where they become slash commands.
+
+### Requirements
+
+- Python 3.9+ and ffmpeg (a full build with libass)
+- `pip install opencv-python numpy yt-dlp faster-whisper`
+- Windows: the Microsoft Visual C++ runtime, for speech-to-text
+
+`python scripts/check_setup.py` reports what is missing and prints the
+install commands.
+
+### Claude chat and YouTube
+
+Claude's cloud chat cannot download from YouTube. There, run
+`assets/pc/get_video.bat` on your PC once per video; it saves the video and
+subtitles to an `inbox` folder that Claude then picks up. In Claude Code on
+your own PC, a link is enough.
+
+## Repository layout
 
 | Path | What it is |
 |---|---|
 | `SKILL.md` | The instructions Claude follows |
-| `references/` | One guide per mode: gameplay, podcast, video |
-| `commands/` | Name, description and mode note for each command skill |
-| `tools/build.py` | Packages the zips (not part of the skill itself) |
-| `scripts/check_setup.py` | Reports what the machine can do, and what to install |
-| `scripts/fetch.py` | Downloads a YouTube video + subtitles (yt-dlp) |
-| `scripts/transcribe.py` | Word-timed transcript (subtitles, faster-whisper or sherpa-onnx) |
-| `scripts/scout.py` | Ranks the stretches with the most sound and motion, with a filmstrip of each |
-| `scripts/analyze_audio.py` | Finds single loud instants |
-| `scripts/peek.py` | Contact sheets and filmstrips of frames, with an optional pixel grid |
-| `scripts/render.py` | Renders the vertical clips |
-| `assets/pc/get_video.bat` | Windows helper: downloads a video for use in Claude chat |
-| `assets/fonts/` | Caption fonts (SIL Open Font License) |
-
-## Requirements
-
-Python 3.9+, ffmpeg (with libass), `opencv-python`, `numpy`, `yt-dlp`, and
-`faster-whisper` or `sherpa-onnx` for speech-to-text. On Windows,
-faster-whisper also needs the Microsoft Visual C++ runtime.
-`python scripts/check_setup.py` lists what is missing.
+| `references/` | A guide per mode, plus `editing.md` on making a clip look edited |
+| `commands/` | Name and description of each command skill |
+| `scripts/` | The tools: `fetch`, `transcribe`, `scout`, `analyze_audio`, `peek`, `track`, `faces`, `sfx`, `render`, `check_setup` |
+| `assets/` | Fonts, face-detector models, and the Windows download helper |
+| `tools/build.py` | Packages the zips |
+| `tools/selftest.py` | Checks the whole skill without rendering video |
 
 ## Status
 
-- Tested on Windows with a real 17-minute gameplay video: YouTube download,
-  audio peaks, scout ranking and filmstrips, `blur` and `center` layouts, hook
-  headline, all four caption styles, watermark, progress bar, preview renders,
-  and the zip build.
-- Tested earlier on a synthetic sample only: `speaker` and `split` layouts,
-  silence trimming, subtitle parsing, sherpa-onnx transcription.
-- Not yet tested: podcast mode on a real video, faster-whisper on Windows,
-  `get_video.bat` run by hand, spoken-Malayalam recognition, the command
-  skills inside the Claude app.
+| Tested on real videos (Windows) | Not yet tested |
+|---|---|
+| Gameplay: download, scout with kill-feed region, `hype` edit, all effects | Sports and tutorial modes |
+| Podcast: subtitles transcript, speaker tracking through camera cuts, `story` edit, captions | The `stack` and `split` layouts on real footage |
+| Build, setup check, self-test (78 checks) | Speech-to-text on Windows, Malayalam speech, the commands inside the Claude app |
+
+Known limits:
+
+- Speaker detection compares mouth movement between faces. It is a
+  heuristic and can pick the wrong person; check a preview.
+- Kill-feed and scoreboard detection counts changes in a region. Claude
+  reads the frames to learn what changed.
+- The edit follows editing convention. It makes clips look finished; it
+  cannot promise views.
+
+## Rights
 
 Only clip videos you own or have permission to reuse.
+
+## Credits and licence
+
+Created by **samknows.ai**.
+
+Released under the [MIT License](LICENSE), copyright © 2026 lowdevco.
+
+Bundled third-party files keep their own licences: the Poppins, Anton and
+Noto Sans Malayalam fonts (SIL Open Font License, texts in `assets/fonts/`),
+the YuNet face-detection models from OpenCV Zoo (MIT), and OpenCV's Haar
+cascade (BSD-style licence, stated in the file).

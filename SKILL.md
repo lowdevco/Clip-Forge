@@ -1,6 +1,6 @@
 ---
 name: clip-forge
-description: Turn a long YouTube video, podcast or gameplay recording into ready-to-post vertical Shorts / Reels / TikToks. Finds the most viral moments (from the transcript for podcasts, from action and sound for gameplay), shows a scored table for approval, then renders 1080x1920 clips with word-by-word captions (English and Malayalam), a hook headline and loudness-normalised audio. Use whenever the user gives a YouTube link or a long video file and wants shorts, reels, clips, highlights, "viral parts", "best moments" or "cut this into short videos", even if they do not name this skill. Also use when a message starts with /clip-gameplay, /clip-podcast or /clip-video.
+description: Turn a long YouTube video, podcast, gameplay recording, match or tutorial into ready-to-post, fully edited vertical Shorts / Reels / TikToks. Finds the most viral moments (from the transcript for talk, from action, sound and scoreboard or kill-feed changes for gameplay and sport), shows a scored table for approval, then renders 1080x1920 clips with a real edit - colour grade, punch-in zooms, slow motion, sound effects, speaker tracking, an animated headline and word-by-word captions (English and Malayalam). Use whenever the user gives a YouTube link or a video file and wants shorts, reels, clips, highlights, "viral parts", "best moments", "cut this into short videos" or "edit this clip", even if they do not name this skill. Also use when a message starts with /clip-gameplay, /clip-podcast, /clip-sports, /clip-tutorial, /clip-video or /clip-edit.
 ---
 
 # ClipForge
@@ -11,8 +11,13 @@ Long video in, a handful of finished vertical clips out. The pipeline is:
 2. Get the video (three routes, below)
 3. Find the moments – how depends on the **mode**
 4. Show a scored table, the user approves
-5. `render.py` – 9:16 clips with captions
+5. Plan the edit for each approved clip, then `render.py`
 6. Titles, captions and hashtags for each clip
+
+The standard to hit is a clip that looks like an experienced editor made it:
+full-screen framing, a designed headline, the picture and sound reacting on
+the moments that matter. A plain cut with a label on top is not the goal.
+`references/editing.md` says how; read it before step 5.
 
 All scripts live in `scripts/` next to this file. Run them with the absolute
 path to that folder. Keep everything for one video in one work folder
@@ -31,13 +36,16 @@ the one reference file for the mode before step 3, and follow it.
 |---|---|---|---|
 | `/clip-gameplay <link>` | gameplay | `references/gameplay.md` | Game recordings and streams, with or without a facecam |
 | `/clip-podcast <link>` | podcast | `references/podcast.md` | Podcasts, interviews, talking head: the moment is in the words |
-| `/clip-video <link>` | video | `references/video.md` | Everything else: vlogs, tutorials, events, sports, reviews |
+| `/clip-sports <link>` | sports | `references/sports.md` | Matches and broadcasts: goals, wickets, points, finishes |
+| `/clip-tutorial <link>` | tutorial | `references/tutorial.md` | How-to, lessons, coding, screen recordings: one complete idea per clip |
+| `/clip-video <link>` | video | `references/video.md` | Everything else: vlogs, reviews, events, travel, reactions |
+| `/clip-edit <file or link>` | edit | `references/edit.md` | The user already has the clip or the times and wants only the edit; replaces steps 3 and 4 |
 
 - If the message starts with one of the commands (or the user names the kind
   of video in words), the mode is settled. Do not second-guess it.
 - With no command, decide from the title, channel and a contact sheet
   (`peek.py --at` with five times spread over the video). If it is still
-  unclear, ask in one line which of the three it is.
+  unclear, ask in one line which mode it is.
 
 Anything after the link is a request to honour, for example
 `/clip-gameplay <link> top 3, neon captions, watermark @myname`.
@@ -101,11 +109,13 @@ Follow the reference file for the mode. The tools it draws on:
 | Tool | What it gives |
 |---|---|
 | `transcribe.py <video> --out <workdir> [--lang en\|ml\|auto] [--model small]` | Word-timed transcript: subtitle file → faster-whisper → sherpa-onnx. Exit code 3 = no transcript possible |
-| `scout.py <video> --out <workdir> [--top 12] [--len 30]` | The stretches with the most sound and motion, ranked, each with an 8-frame filmstrip in `<workdir>/scout/`, plus `end.jpg` for the last 45 s |
+| `scout.py <video> --out <workdir> [--top 12] [--len 30] [--kind sports] [--roi x,y,w,h]` | The stretches with the most sound and motion, ranked, each with an 8-frame filmstrip in `<workdir>/scout/`, plus `end.jpg` for the last 45 s. `--roi` is the kill-feed or scoreboard box: every change there is counted and timed |
+| `track.py <video> --clips <workdir>/clips.json --write` | Who is on screen and who is talking in each clip; writes a suggested layout, face positions and a speaker-following crop path into `clips.json` |
 | `analyze_audio.py <video> --out <workdir>` | Single loud instants (a laugh, a shout) with their lift in dB |
 | `peek.py <video> --at 754,760 --out x.jpg` | Frames at exact times |
 | `peek.py <video> --range 998-1032 --n 8 --out x.jpg` | A filmstrip of one stretch, start to finish |
-| `peek.py <video> --at 600 --grid --out x.jpg` | One frame with a pixel grid, for reading a facecam box |
+| `peek.py <video> --at 600 --grid --out x.jpg` | One frame with a pixel grid, for reading the box of a facecam, kill feed or scoreboard |
+| `peek.py <video> --at 600,640 --crop x,y,w,h --out x.jpg` | One region enlarged, for reading a score or other small on-screen text |
 
 Notes on transcription:
 
@@ -149,53 +159,77 @@ Show the table and stop for approval:
 
 Ask which numbers to render (and offer "top 5"). Do not render before the
 user answers; rendering is the slow part and their taste decides. In the same
-message, ask once for anything not yet known that changes the render: caption
-style, a channel tag for the watermark, progress bar on or off.
+message, ask once for anything not yet known that changes the render: the
+channel handle for the watermark, and whether they want a different look
+from the mode's default edit.
 
-The hook line is the 3–8 word headline burned at the top for the first
-3.5 seconds. Write it to create curiosity without lying about the clip: only
+The hook line is the 3–8 word headline shown for the first 3.5 seconds. Put
+`*stars*` around the one or two words that carry it; they take the accent
+colour. Write it to create curiosity without lying about the clip: only
 claim what you saw or read. Use the language the speaker uses (Malayalam hook
 for a Malayalam clip).
 
-## 5. Render
+## 5. Plan the edit and render
 
-Write `<workdir>/clips.json` for the approved clips:
+Read `references/editing.md` now. Then, for each approved clip, decide the
+layout, the edit, the headline and the beats, and write
+`<workdir>/clips.json`:
 
 ```json
 {"clips": [
-  {"id": 1, "start": 754.2, "end": 790.6, "hook": "He quit a ₹40 lakh job for this",
-   "slug": "quit-job", "layout": "auto", "tighten": true},
-  {"id": 4, "start": 2210, "end": 2236, "hook": "1 HP. Four enemies.",
-   "layout": "split", "facecam": [1480, 30, 420, 320], "captions": false}
+  {"id": 1, "start": 754.2, "end": 790.6, "hook": "He quit a *₹40 lakh* job",
+   "slug": "quit-job", "layout": "auto", "edit": "story", "tighten": true},
+  {"id": 4, "start": 2210, "end": 2236, "hook": "1 HP. *Four enemies.*",
+   "layout": "center", "edit": "hype", "captions": false,
+   "beats": ["auto", {"t": 2229.4, "fx": ["punch", "flash"], "text": "Clutch"},
+             {"t": 2231.0, "fx": "slowmo", "len": 1.2}]}
 ]}
 ```
+
+Edits (the mode reference says which suits the mode):
+
+| Edit | What it does |
+|---|---|
+| `hype` | Vivid grade, slow push-in, punch + shake + flash with a bass thump on each beat, condensed all-caps headline, progress bar |
+| `premium` | Punchy grade, slow push-in, punch-in with a soft thump on each beat, bold headline (default) |
+| `story` | Soft grade, zoom cuts on sentence changes, animated captions |
+| `clean` | Soft grade and animated text only |
+| `raw` | Plain cut, boxed headline, static captions |
+
+Beats are the moments the picture reacts to. Leave `"beats"` out to have
+them found from the sound, or list your own (`t` in source seconds; `fx` of
+`punch`, `shake`, `flash`, `slowmo`; optional `text` for a callout word).
 
 Layouts (the mode reference says which to pick):
 
 | Layout | Result |
 |---|---|
-| `speaker` | 9:16 crop centred on the detected face |
+| `speaker` | 9:16 crop centred on the detected face; follows `"focus_path"` from `track.py` when present |
 | `auto` | `speaker` if a clear face is found, otherwise `blur` |
-| `center` | 9:16 crop that fills the screen; `"focus_x": 0–1` slides it left or right |
-| `blur` | Whole width kept in the middle, blurred copy above and below; `"zoom": 1.0–2.5` enlarges the sharp picture and trims its sides |
+| `center` | 9:16 crop that fills the screen; `"focus_x": 0–1` slides it, `"focus_path"` moves it over time |
+| `stack` | Two speakers, one above the other; face positions come from `track.py` or `"faces"` |
 | `split` | Facecam on top, game below; needs `"facecam": [x, y, w, h]` |
+| `blur` | Whole width kept in the middle, blurred copy above and below; `"zoom": 1.0–2.5` enlarges the sharp picture. Last resort: it leaves the picture small |
 
 Looks, set for every clip on the command line or per clip in `clips.json`:
 
 | Option | Per-clip key | What it does |
 |---|---|---|
-| `--style bold\|clean\|neon\|fire` | `"style"` | Caption look. `bold`: big white capitals, yellow highlight (default). `clean`: smaller sentence case, pale blue highlight, sits lower. `neon`: green highlight, purple outline. `fire`: largest, orange highlight |
+| `--edit hype\|premium\|story\|clean\|raw` | `"edit"` | The editing treatment |
+| `--style bold\|clean\|neon\|fire` | `"style"` | Caption look and accent colour. `bold`: white capitals, yellow accent (default). `clean`: smaller sentence case, pale blue. `neon`: green accent, purple outline. `fire`: largest, orange accent |
+| `--outro "Follow for more"` | `"outro"` | Tag that pops over the last 1.6 s |
 | `--watermark "@name"` | `"watermark"` | Small see-through channel tag for the whole clip |
 | `--progress` | `"progress"` | Thin bar along the top that fills as the clip plays |
 
 ```
-python scripts/render.py <video> --clips <workdir>/clips.json --out <workdir>/shorts [--style neon] [--watermark "@name"] [--progress]
+python scripts/render.py <video> --clips <workdir>/clips.json --out <workdir>/shorts [--edit hype] [--style fire] [--outro "Follow for more"] [--watermark "@name"]
 ```
 
-One JSON line per clip (`ok`, `file`, `layout`, `style`, `seconds`,
-`silence_cut`). Roughly real time per clip on a small machine, so say how
-long it will take. When the framing is a guess (a new layout, a facecam box,
-a zoom level), run once with `--preview` first: it makes small fast drafts
+One JSON line per clip (`ok`, `file`, `layout`, `edit`, `seconds`, and
+`beats` with the times the effects landed). A full render takes about one
+and a half times the clip's length per clip on an ordinary PC, so say how
+long it will take and run it in the background. When the framing or a beat
+time is a guess, run once with `--preview` first: it makes small fast drafts
 (`*_preview.mp4`) to check before the full render.
 
 Then check your own work before showing it: pull one frame from each clip
@@ -205,8 +239,10 @@ and look at it.
 ffmpeg -y -loglevel error -ss 2 -i <clip.mp4> -frames:v 1 <workdir>/check_01.jpg
 ```
 
-Confirm the subject is in frame, the hook is readable, and captions do not
-sit on a face or on the part of the game that matters. Fix by changing the
+Look at the headline (2 s), one beat, and the last second. Confirm the
+subject is in frame, the hook is readable, captions do not sit on a face or
+on the part of the game that matters, and the clip does not run into an end
+card or a menu. Fix by changing the
 layout, `zoom`, `focus_x` or `facecam` and re-render just that clip with
 `--only <id>`.
 
@@ -244,7 +280,10 @@ more clips from the remaining candidates.
 - **Captions are wrong words** – the transcript is wrong, not the renderer.
   Fix the words in `transcript.json` for that clip's time range and
   re-render, or re-run `transcribe.py` with a bigger `--model`.
-- **Face crop follows the wrong person** – switch that clip to `blur`, or
-  `center` with a `focus_x`.
+- **Face crop follows the wrong person** – `track.py` guesses the speaker
+  from mouth movement and can be wrong. Switch that clip to `stack` (both
+  people on screen), or `center` with a `focus_x`.
+- **The edit feels like too much** – drop to `premium` or `clean`, or give
+  an explicit short `beats` list in place of the automatic ones.
 - **`ass` filter missing** – ffmpeg was built without libass; `check_setup`
   says how to install a full build.

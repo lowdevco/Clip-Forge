@@ -5,6 +5,7 @@ Usage: python check_setup.py
 """
 import importlib.util
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -76,6 +77,17 @@ def main():
         "github_reachable": reachable("https://github.com/"),
     }
     info["mode"] = "local" if info["youtube_reachable"] else "cloud"
+    # yunet = good face tracking; haar = basic; none = no speaker framing
+    info["face_detector"] = "none"
+    if info["opencv"]:
+        try:
+            res = subprocess.run(
+                [sys.executable, "-c", "import faces; print(faces.kind())"],
+                capture_output=True, text=True, timeout=120,
+                cwd=os.path.dirname(os.path.abspath(__file__)))
+            info["face_detector"] = (res.stdout.strip().splitlines() or ["none"])[-1]
+        except Exception:  # noqa: BLE001
+            pass
 
     todo = []
     pip = f"{sys.executable} -m pip install"

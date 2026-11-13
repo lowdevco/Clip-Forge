@@ -6,8 +6,12 @@ Usage:
   python peek.py VIDEO --at 75,312.5,1040 --out WORKDIR/peek.jpg [--grid]
   python peek.py VIDEO --range 998-1032 --n 8 --out WORKDIR/strip.jpg
 
+  python peek.py VIDEO --at 600,640 --crop 1500,40,400,200 --out WORKDIR/hud.jpg
+
 --range takes N evenly spaced frames from START-END (seconds): a filmstrip
 that shows how one moment plays out from start to finish.
+--crop shows only one region of the frame, enlarged, so small on-screen text
+(a scoreboard, a kill feed, a timer) can be read.
 --grid draws 10% guide lines with pixel labels on each frame; use it to read
 off a facecam box [x, y, w, h] in source pixels for the "split" layout.
 """
@@ -23,7 +27,7 @@ def spread(start, end, n):
     return [start + (end - start) * (i + 0.5) / n for i in range(n)]
 
 
-def make_sheet(video, times, out, grid=False, cols=3, tile_w=None):
+def make_sheet(video, times, out, grid=False, cols=3, tile_w=None, crop=None):
     cap = cv2.VideoCapture(video)
     tiles = []
     for t in times:
@@ -31,6 +35,11 @@ def make_sheet(video, times, out, grid=False, cols=3, tile_w=None):
         ok, frame = cap.read()
         if not ok:
             continue
+        if crop:
+            x, y, w, h = crop
+            frame = frame[y:y + h, x:x + w]
+            if frame.size == 0:
+                continue
         H, W = frame.shape[:2]
         if grid:
             for i in range(1, 10):
@@ -69,7 +78,10 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--grid", action="store_true")
     ap.add_argument("--cols", type=int)
+    ap.add_argument("--crop", help="x,y,w,h in source pixels: show only this "
+                    "region, enlarged (read a scoreboard, kill feed or HUD)")
     args = ap.parse_args()
+    crop = [int(v) for v in args.crop.split(",")] if args.crop else None
 
     if args.span:
         a, b = (float(x) for x in args.span.split("-", 1))
@@ -78,7 +90,7 @@ def main():
         times, cols = [float(x) for x in args.at.split(",")], args.cols or 3
     else:
         raise SystemExit("give --at or --range")
-    if not make_sheet(args.video, times, args.out, args.grid, cols):
+    if not make_sheet(args.video, times, args.out, args.grid, cols, crop=crop):
         raise SystemExit("no frames could be read")
     print(args.out)
 
