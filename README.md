@@ -11,7 +11,7 @@ The clips come out edited, not just cut: the picture fills the screen, the
 colour is graded, the camera punches in on the big moments, and the headline
 and captions are animated.
 
-Created by **samknows.ai** · MIT licence © lowdevco
+Created by [samknows.ai](https://www.instagram.com/samknows.ai)
 
 ## What you type
 
@@ -93,7 +93,7 @@ python Clip-Forge/tools/build.py --install
 ### Claude chat (claude.ai and the desktop app)
 
 1. Download `clip-forge.zip` from the
-   [latest release](https://github.com/lowdevco/Clip-Forge/releases/latest).
+   [latest release](https://github.com/lowdevco/Clip-Forge/releases/latest)
 2. In Claude, open **Settings**, find **Skills**, and upload the zip.
 3. Start a message with a command, or share a link and ask for shorts.
 
@@ -152,7 +152,7 @@ Only clip videos you own or have permission to reuse.
 
 ## Credits and licence
 
-Created by **samknows.ai**.
+Created by [samknows.ai](https://www.instagram.com/samknows.ai)
 
 Released under the [MIT License](LICENSE), copyright © 2026 lowdevco.
 
