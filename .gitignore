@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+# videos and per-video work folders never belong in the repo
+inbox/
+work/
+shorts/
+_work/
+*.mp4
+*.mkv
+*.webm
+*.wav
+# packaged builds
+dist/
+*.skill
+*.zip
