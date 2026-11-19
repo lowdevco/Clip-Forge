@@ -5,29 +5,54 @@ description: Turn a long YouTube video, podcast, gameplay recording, match or tu
 
 # ClipForge
 
-Long video in, a handful of finished vertical clips out. The pipeline is:
+Long video in, a handful of finished vertical clips out. ClipForge is built
+by lowdevco.
 
-1. `check_setup.py` – what can this machine do?
-2. Get the video (three routes, below)
-3. Find the moments – how depends on the **mode**
-4. Show a scored table, the user approves
-5. Plan the edit for each approved clip, then `render.py`
-6. Titles, captions and hashtags for each clip
+The bar is a clip that looks like an experienced editor made it: the picture
+fills the frame, the colour has punch, the picture and sound react on the
+moments that matter, and the headline and captions are designed and timed.
+A plain cut with a label on top is not the goal.
 
-The standard to hit is a clip that looks like an experienced editor made it:
-full-screen framing, a designed headline, the picture and sound reacting on
-the moments that matter. A plain cut with a label on top is not the goal.
-`references/editing.md` says how; read it before step 5.
+## At a glance
 
-All scripts live in `scripts/` next to this file. Run them with the absolute
-path to that folder. Keep everything for one video in one work folder
-(`<workdir>`), with finished clips in `<workdir>/shorts`.
+| Step | You do | Output | Stop for the user? |
+|---|---|---|---|
+| 0. Mode | Settle the kind of video, read its reference | `references/<mode>.md` in mind | Only if the mode is unclear |
+| 1. Check | `check_setup.py` | `mode`, `todo`, `speech_to_text` | Before installing anything on their PC |
+| 2. Get | `fetch.py`, the .bat route, or a file already here | `<workdir>/<video>.mp4` (+ subtitles) | Videos over ~90 min: whole or a section? |
+| 3. Find | Tools from the mode reference | Candidate moments | No |
+| 4. Score | Score, table, ask | Approved clip numbers | **Always.** Never render before the answer |
+| 5. Edit | Plan → render → quality check | `<workdir>/shorts/*.mp4` | No |
+| 6. Post copy | Title, caption, hashtags | `<workdir>/shorts/posts.md` | No |
+| 7. Hand over | Deliver files, list clips, offer changes | The reply | It ends the turn |
 
-Only work on videos the user owns or has permission to reuse. If they are
-clipping someone else's channel, mention once that re-uploading needs the
-owner's permission, then carry on with what they asked.
+Working conventions:
 
-## Mode
+- All scripts live in `scripts/` next to this file. Call them with the
+  absolute path to that folder.
+- One work folder per video (`<workdir>`); finished clips go in
+  `<workdir>/shorts`.
+- Anything that takes more than a minute or two (speech-to-text, scouting,
+  rendering) runs in the background, and you tell the user roughly how long.
+
+## Ground rules
+
+1. **Rights.** Only work on videos the user owns or may reuse. If they are
+   clipping someone else's channel, say once that re-uploading needs the
+   owner's permission, then carry on.
+2. **Approval before rendering.** Rendering is the slow part and their taste
+   decides. Show the scored table and wait.
+3. **Never invent.** Hooks, callouts, kill counts, scores and quotes come from
+   what you saw in frames or read in the transcript. Never make up a channel
+   handle; ask for it once.
+4. **Honest scores.** Three good moments get three high scores, not twelve
+   85s. Say when you judged from still frames only.
+5. **Check your own work.** Look at frames of every rendered clip before
+   showing it (step 5c).
+6. **Restraint.** Three well-placed beats in 30 s feel edited; ten feel like
+   a filter.
+
+## 0. Mode
 
 The kind of video decides how moments are found, framed and captioned. Read
 the one reference file for the mode before step 3, and follow it.
@@ -41,14 +66,13 @@ the one reference file for the mode before step 3, and follow it.
 | `/clip-video <link>` | video | `references/video.md` | Everything else: vlogs, reviews, events, travel, reactions |
 | `/clip-edit <file or link>` | edit | `references/edit.md` | The user already has the clip or the times and wants only the edit; replaces steps 3 and 4 |
 
-- If the message starts with one of the commands (or the user names the kind
-  of video in words), the mode is settled. Do not second-guess it.
+- A command at the start of the message (or the kind of video named in
+  words) settles the mode. Do not second-guess it.
 - With no command, decide from the title, channel and a contact sheet
-  (`peek.py --at` with five times spread over the video). If it is still
-  unclear, ask in one line which mode it is.
-
-Anything after the link is a request to honour, for example
-`/clip-gameplay <link> top 3, neon captions, watermark @myname`.
+  (`peek.py --at` with five times spread over the video). Still unclear: ask
+  in one line.
+- Anything after the link is a request to honour, for example
+  `/clip-gameplay <link> top 3, neon captions, watermark @myname`.
 
 ## 1. Check the machine
 
@@ -59,14 +83,11 @@ python scripts/check_setup.py
 Read `mode`, `todo` and `speech_to_text`. Install what `todo` lists (they are
 copy-paste commands; ask before installing on the user's own PC).
 
-- **`mode: local`** – YouTube is reachable (Claude Code on the user's own PC).
-  The whole pipeline runs from just a link.
-- **`mode: cloud`** – YouTube is blocked (Claude chat / cloud sessions). The
-  download has to happen on the user's computer; everything after that runs
-  here. Do not retry the download through other tools or mirrors, the block
-  is at the network level.
-- **`speech_to_text: false`** – no transcript can be made here unless the
-  video has subtitles. Podcast mode needs one; say so before starting.
+| Result | Meaning |
+|---|---|
+| `mode: local` | YouTube is reachable (Claude Code on the user's own PC). The whole pipeline runs from just a link |
+| `mode: cloud` | YouTube is blocked (Claude chat / cloud sessions). The download happens on the user's computer; everything after runs here. Do not retry through other tools or mirrors: the block is at the network level |
+| `speech_to_text: false` | No transcript can be made here unless the video has subtitles. Podcast mode needs one; say so before starting |
 
 ## 2. Get the video
 
@@ -85,20 +106,20 @@ Say plainly, in one or two sentences, that this chat cannot download from
 YouTube itself and the download takes one step on their PC. Then:
 
 1. Send them `assets/pc/get_video.bat` (once; they keep it in a folder of
-   their choice, e.g. a project folder they have connected to the chat).
+   their choice, e.g. a project folder connected to the chat).
 2. They double-click it and paste the link. It saves the video, subtitles
    and info file into an `inbox` folder next to the .bat. Default is 720p to
    keep the file small; `get_video.bat <url> 1080` gives sharper crops.
-3. If computer-folder tools are available in this session (names containing
+3. If computer-folder tools are available (names containing
    `remote-devices`), list the `inbox` folder, copy the `.mp4` and every
    `.json3` / `.vtt` beside it into the workspace, and continue. Those tools
    usually cap one file at about 400 MB: if the video is bigger, ask them to
-   re-run the .bat at 480, or to tell you which part of the video matters.
-4. If there are no such tools, ask them to attach the video and subtitle
-   file to the chat (works for small files only), or to run this skill in
-   Claude Code on the PC where route A works end to end.
+   re-run the .bat at 480, or to say which part of the video matters.
+4. With no such tools, ask them to attach the video and subtitle file (small
+   files only), or to run this skill in Claude Code on the PC where route A
+   works end to end.
 
-**C. A video file is already here** (attached, or in a connected folder) –
+**C. A video file is already here** (attached, or in a connected folder):
 use it directly. A subtitle file with the same name beside it is picked up
 automatically.
 
@@ -117,25 +138,24 @@ Follow the reference file for the mode. The tools it draws on:
 | `peek.py <video> --at 600 --grid --out x.jpg` | One frame with a pixel grid, for reading the box of a facecam, kill feed or scoreboard |
 | `peek.py <video> --at 600,640 --crop x,y,w,h --out x.jpg` | One region enlarged, for reading a score or other small on-screen text |
 
-Notes on transcription:
+Transcripts:
 
 - `exact_word_timing: false` means word timings are estimated inside each
-  line. Captions still work, the highlight is just a little less tight.
-- Speech-to-text on a long video is slow on a small machine (roughly real
-  time with `small` on 2 CPUs). Run it in the background and tell the user.
-  Do not go below `small` for Malayalam, and tell the user Malayalam captions
-  will need a read-through.
-- After it finishes, read `<workdir>/transcript.txt` in full. It is the
-  compact `[mm:ss] text` version; the JSON is for the renderer.
+  line. Captions still work; the highlight is a little less tight.
+- Speech-to-text is roughly real time with `small` on 2 CPUs. Run it in the
+  background and tell the user. Do not go below `small` for Malayalam, and
+  say Malayalam captions will need a read-through.
+- When it finishes, read `<workdir>/transcript.txt` in full (compact
+  `[mm:ss] text`; the JSON is for the renderer).
 
-`scout.py` takes about two minutes for a 17-minute 1080p video. Its `action`
-number is a rank inside that one video: it tells you where to look first, not
-how good the moment is. Open the filmstrips and judge with your own eyes.
+Scouting: `scout.py` takes about two minutes for a 17-minute 1080p video. Its
+`action` number is a rank inside that one video: it says where to look first,
+not how good the moment is. Open the filmstrips and judge with your own eyes.
 
 ## 4. Score and get approval
 
 Aim for 8–12 candidates on a long video (fewer if it is short), each 20–60 s;
-action moments can be as short as 12 s. Do not overlap them.
+action moments can be as short as 12 s. No overlaps.
 
 Score each out of 100:
 
@@ -147,33 +167,41 @@ Score each out of 100:
 | Emotion | 15 | Surprise, laughter, tension, awe, or strong disagreement |
 | Pace | 10 | No dead stretch; the length fits the content |
 
-Be honest with the scores. A long video with three good moments should get
-three high scores and several mediocre ones, not twelve 85s. If you judged a
-moment from still frames only, say so.
-
-Show the table and stop for approval:
+Show the table, best first:
 
 | # | Time | Len | Score | Hook line (on screen) | Why it works |
 |---|---|---|---|---|---|
 | 1 | 12:34–13:10 | 36s | 88 | He quit a ₹40 lakh job for this | Bold claim up front, clean ending |
 
-Ask which numbers to render (and offer "top 5"). Do not render before the
-user answers; rendering is the slow part and their taste decides. In the same
-message, ask once for anything not yet known that changes the render: the
-channel handle for the watermark, and whether they want a different look
-from the mode's default edit.
+Then, in the same message, ask:
+
+- which numbers to render (offer "top 5");
+- the channel handle for the watermark, if not known;
+- whether they want a different look from the mode's default edit.
+
+**Stop here until they answer.**
 
 The hook line is the 3–8 word headline shown for the first 3.5 seconds. Put
 `*stars*` around the one or two words that carry it; they take the accent
-colour. Write it to create curiosity without lying about the clip: only
-claim what you saw or read. Use the language the speaker uses (Malayalam hook
-for a Malayalam clip).
+colour. Create curiosity without lying about the clip. Use the speaker's
+language (Malayalam hook for a Malayalam clip).
 
-## 5. Plan the edit and render
+## 5. Edit
 
-Read `references/editing.md` now. Then, for each approved clip, decide the
-layout, the edit, the headline and the beats, and write
-`<workdir>/clips.json`:
+Read `references/editing.md` now. It is the editing standard; this section
+is the short version.
+
+### 5a. Plan each clip
+
+For every approved clip decide five things, then write `<workdir>/clips.json`:
+
+| Decide | Key | Rule of thumb |
+|---|---|---|
+| Framing | `layout` | Fill the screen: `center` or `speaker` first, `blur` last |
+| Treatment | `edit` | From the mode reference, unless the user named a look |
+| Headline | `hook` | 3–8 words, one or two `*starred*` words, true to the clip |
+| Beats | `beats` | The 2–3 moments the picture reacts to; exact times beat `auto` |
+| Ending | `end`, `outro` | End on the payoff, never in an end card or menu |
 
 ```json
 {"clips": [
@@ -186,21 +214,22 @@ layout, the edit, the headline and the beats, and write
 ]}
 ```
 
-Edits (the mode reference says which suits the mode):
+**Edits**
 
-| Edit | What it does |
-|---|---|
-| `hype` | Vivid grade, slow push-in, punch + shake + flash with a bass thump on each beat, condensed all-caps headline, progress bar |
-| `premium` | Punchy grade, slow push-in, punch-in with a soft thump on each beat, bold headline (default) |
-| `story` | Soft grade, zoom cuts on sentence changes, animated captions |
-| `clean` | Soft grade and animated text only |
-| `raw` | Plain cut, boxed headline, static captions |
+| Edit | Best for | What it does |
+|---|---|---|
+| `hype` | Gameplay, sports, anything fast | Vivid grade, slow push-in, punch + shake + flash with a bass thump on each beat, condensed all-caps headline, progress bar |
+| `premium` | General video (default) | Punchy grade, slow push-in, punch-in with a soft thump on each beat, bold headline |
+| `story` | Podcasts, interviews, talking head | Soft grade, zoom cuts on sentence changes, animated captions |
+| `clean` | Business, tutorials, serious topics | Soft grade and animated text only |
+| `raw` | When the user wants it untouched | Plain cut, boxed headline, static captions |
 
-Beats are the moments the picture reacts to. Leave `"beats"` out to have
-them found from the sound, or list your own (`t` in source seconds; `fx` of
-`punch`, `shake`, `flash`, `slowmo`; optional `text` for a callout word).
+**Beats** are the moments the picture reacts to. Leave `"beats"` out to have
+them found from the sound, or list your own: `t` in source seconds, `fx` of
+`punch`, `shake`, `flash`, `slowmo`, optional `text` for a one-to-three word
+callout. Slow motion at most once per clip, on the payoff.
 
-Layouts (the mode reference says which to pick):
+**Layouts**
 
 | Layout | Result |
 |---|---|
@@ -211,7 +240,7 @@ Layouts (the mode reference says which to pick):
 | `split` | Facecam on top, game below; needs `"facecam": [x, y, w, h]` |
 | `blur` | Whole width kept in the middle, blurred copy above and below; `"zoom": 1.0–2.5` enlarges the sharp picture. Last resort: it leaves the picture small |
 
-Looks, set for every clip on the command line or per clip in `clips.json`:
+**Looks**, for every clip on the command line or per clip in `clips.json`:
 
 | Option | Per-clip key | What it does |
 |---|---|---|
@@ -221,69 +250,71 @@ Looks, set for every clip on the command line or per clip in `clips.json`:
 | `--watermark "@name"` | `"watermark"` | Small see-through channel tag for the whole clip |
 | `--progress` | `"progress"` | Thin bar along the top that fills as the clip plays |
 
+### 5b. Render
+
 ```
 python scripts/render.py <video> --clips <workdir>/clips.json --out <workdir>/shorts [--edit hype] [--style fire] [--outro "Follow for more"] [--watermark "@name"]
 ```
 
-One JSON line per clip (`ok`, `file`, `layout`, `edit`, `seconds`, and
-`beats` with the times the effects landed). A full render takes about one
-and a half times the clip's length per clip on an ordinary PC, so say how
-long it will take and run it in the background. When the framing or a beat
-time is a guess, run once with `--preview` first: it makes small fast drafts
-(`*_preview.mp4`) to check before the full render.
+- It prints one JSON line per clip: `ok`, `file`, `layout`, `edit`,
+  `seconds`, and `beats` with the times the effects landed.
+- A full render takes about 1.5× the clip's length per clip on an ordinary
+  PC. Say how long, and run it in the background.
+- When framing or a beat time is a guess, run `--preview` first: small fast
+  drafts (`*_preview.mp4`) to check before the full render.
+- Re-render one clip with `--only <id>`.
 
-Then check your own work before showing it: pull one frame from each clip
-and look at it.
+### 5c. Quality check
+
+Pull frames from each clip and look at them before showing anything:
 
 ```
 ffmpeg -y -loglevel error -ss 2 -i <clip.mp4> -frames:v 1 <workdir>/check_01.jpg
 ```
 
-Look at the headline (2 s), one beat, and the last second. Confirm the
-subject is in frame, the hook is readable, captions do not sit on a face or
-on the part of the game that matters, and the clip does not run into an end
-card or a menu. Fix by changing the
-layout, `zoom`, `focus_x` or `facecam` and re-render just that clip with
-`--only <id>`.
+Check the headline (2 s), one beat, and the last second. Every clip must pass:
+
+| Check | Fix if it fails |
+|---|---|
+| The subject is in frame, nothing important cropped off | `layout`, `focus_x`, `zoom` or `facecam` |
+| The frame is full, not a small picture floating in blur | `center` / `speaker`, or `blur` with `"zoom": 1.6`+ and `"hook_hold": true` |
+| The hook is readable and true to the clip | Rewrite `hook` |
+| Captions do not sit on a face or on the part of the game that matters | `layout` or `"captions": false` for voiceless gameplay |
+| Beats land on the actual moment, not near it | Exact `t` in `beats` |
+| The clip ends on the payoff, not in an end card or menu | Move `end`; check with `peek.py --range` |
+| Caption words are right (names, terms) | Fix `transcript.json`, re-render |
+
+Re-render just the failing clip with `--only <id>`.
 
 ## 6. Post copy
 
-For each rendered clip write, in the clip's language:
+For each rendered clip, in the clip's language:
 
-- **Title** (under 60 characters, the hook rephrased, no clickbait the clip
-  does not pay off)
-- **Caption** (1–2 lines plus a question or call to action)
-- **Hashtags** (3–5: one broad, the rest specific to the topic or game)
+- **Title**: under 60 characters, the hook rephrased, no clickbait the clip
+  does not pay off.
+- **Caption**: 1–2 lines plus a question or call to action.
+- **Hashtags**: 3–5, one broad, the rest specific to the topic or game.
 
 Save them as `<workdir>/shorts/posts.md` and show them in the reply.
 
 ## 7. Hand over
 
-- Local mode: say where the `shorts` folder is.
-- Cloud mode: send each `.mp4` and `posts.md` to the user as files. If the
-  video came from a connected folder on their computer, also save the clips
-  into a `shorts` folder beside the `inbox`.
+- **Local mode**: say where the `shorts` folder is.
+- **Cloud mode**: send each `.mp4` and `posts.md` as files. If the video came
+  from a connected folder on their computer, also save the clips into a
+  `shorts` folder beside the `inbox`.
 
-Finish with one line per clip (number, length, hook) and offer changes:
-different start or end, another layout or caption style, a new hook line,
+Finish with one line per clip (number, length, hook) and offer changes: a
+different start or end, another layout or caption style, a new hook line, or
 more clips from the remaining candidates.
 
 ## Things that go wrong
 
-- **Download fails in local mode with a sign-in or bot message** – update
-  yt-dlp (`python -m pip install -U yt-dlp`) and retry once. If it still
-  fails, ask the user to download the video another way and use route C.
-- **`transcribe.py` exits 3 with a "could not find module ... dll" error** –
-  the speech engine is installed but cannot load. `check_setup.py` prints the
-  fix (on Windows, the Visual C++ runtime). This is a machine problem, not a
-  silent video: say so rather than treating the video as speechless.
-- **Captions are wrong words** – the transcript is wrong, not the renderer.
-  Fix the words in `transcript.json` for that clip's time range and
-  re-render, or re-run `transcribe.py` with a bigger `--model`.
-- **Face crop follows the wrong person** – `track.py` guesses the speaker
-  from mouth movement and can be wrong. Switch that clip to `stack` (both
-  people on screen), or `center` with a `focus_x`.
-- **The edit feels like too much** – drop to `premium` or `clean`, or give
-  an explicit short `beats` list in place of the automatic ones.
-- **`ass` filter missing** – ffmpeg was built without libass; `check_setup`
-  says how to install a full build.
+| Symptom | Cause and fix |
+|---|---|
+| Download fails in local mode with a sign-in or bot message | Update yt-dlp (`python -m pip install -U yt-dlp`) and retry once. Still failing: ask the user to download it another way and use route C |
+| `transcribe.py` exits 3 with "could not find module ... dll" | The speech engine is installed but cannot load. `check_setup.py` prints the fix (on Windows, the Visual C++ runtime). A machine problem, not a silent video: say so |
+| Captions are wrong words | The transcript is wrong, not the renderer. Fix the words in `transcript.json` for that range and re-render, or re-run `transcribe.py` with a bigger `--model` |
+| Face crop follows the wrong person | `track.py` guesses the speaker from mouth movement. Switch that clip to `stack`, or `center` with a `focus_x` |
+| The edit feels like too much | Drop to `premium` or `clean`, or give a short explicit `beats` list instead of `auto` |
+| `ass` filter missing | ffmpeg was built without libass; `check_setup` says how to install a full build |

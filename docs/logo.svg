@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="ClipForge logo">
+  <title>ClipForge</title>
+  <!-- a 9:16 clip with a play cut out of it -->
+  <rect x="31" y="8" width="58" height="104" rx="16" fill="#FF4D2E"/>
+  <path d="M52 43 L75 60 L52 77 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"/>
+</svg>

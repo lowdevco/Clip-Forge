@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.svg" width="120" alt="ClipForge" />
+
 <h1>ClipForge</h1>
 
 <p><strong>Paste a link. Pick your favourites. Get Shorts that look edited.</strong></p>
@@ -17,13 +19,7 @@
   and captions are animated.
 </p>
 
-<p>Created by <a href="https://www.instagram.com/samknows.ai">samknows.ai</a></p>
-
-<p>
-  <a href="https://www.instagram.com/samknows.ai/">
-    <img src="https://raw.githubusercontent.com/lowdevco/Video-editing-effects/main/assets/samknowsai.jpeg" width="380" alt="samknows.ai" />
-  </a>
-</p>
+<p>Created by <a href="https://github.com/lowdevco">lowdevco</a></p>
 
 <hr />
 
@@ -399,7 +395,7 @@
 
 <h2>Credits and licence</h2>
 
-<p>Created by <a href="https://www.instagram.com/samknows.ai">samknows.ai</a></p>
+<p>Created by <a href="https://github.com/lowdevco">lowdevco</a></p>
 
 <p>Released under the <a href="LICENSE">MIT License</a>, copyright &copy; 2026 lowdevco.</p>
 
